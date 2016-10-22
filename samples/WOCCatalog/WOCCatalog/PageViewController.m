@@ -17,6 +17,10 @@
 #import <Foundation/Foundation.h>
 #import "PageViewController.h"
 
+#import <UWP/WindowsUICore.h>
+#import <UWP/WindowsUITextCore.h>
+#import <UWP/WindowsUIViewManagement.h>
+
 static const int c_numControllers = 3;
 
 @interface PageViewController () <UIPageViewControllerDataSource, UIPageViewControllerDelegate>
@@ -77,6 +81,129 @@ static const int c_numControllers = 3;
     [self.view addSubview:reverseButton];
 #endif
 
+    // Create a label to naively show some text.
+    UILabel* textLabel = [[UILabel alloc] initWithFrame:CGRectMake(100, 100, 200, 30)];
+    textLabel.backgroundColor = [UIColor lightGrayColor];
+    textLabel.text = @"";
+
+    [self.view addSubview:textLabel];
+
+    // The CoreTextEditContext processes text input, but other keys are
+    // the apps's responsibility.
+    //_coreWindow = CoreWindow.GetForCurrentThread();
+    WUCCoreWindow* coreWindow = coreWindow = [WUCCoreWindow getForCurrentThread];
+    
+    //_coreWindow.KeyDown += CoreWindow_KeyDown;
+    EventRegistrationToken keyDownToken = [coreWindow addKeyDownEvent:^(WUCCoreWindow *window, WUCKeyEventArgs *args) {
+        switch (args.virtualKey) {
+            // Backspace
+            case WSVirtualKeyBack:
+                textLabel.text = [textLabel.text substringToIndex:textLabel.text.length-1];
+                break;
+            default:
+                // Do nothing?
+                break;
+        }
+    }];
+    
+    // Create a CoreTextEditContext for our custom edit control.
+    //CoreTextServicesManager manager = CoreTextServicesManager.GetForCurrentView();
+    WUTCCoreTextServicesManager* manager = [WUTCCoreTextServicesManager getForCurrentView];
+    //_editContext = manager.CreateEditContext();
+    WUTCCoreTextEditContext* editContext = [manager createEditContext];
+
+    //_coreWindow.PointerPressed += CoreWindow_PointerPressed;
+    EventRegistrationToken pointerPressedToken = [coreWindow addPointerPressedEvent:^(WUCCoreWindow* window, WUCPointerEventArgs* args) {
+        // Set focus on the input context
+        [editContext notifyFocusEnter];
+    }];
+
+    // Get the Input Pane so we can programmatically hide and show it.
+    //_inputPane = InputPane.GetForCurrentView();
+    WUVInputPane* inputPane = [WUVInputPane getForCurrentView];
+
+    // For demonstration purposes, this sample sets the Input Pane display policy to Manual
+    // so that it can manually show the software keyboard when the control gains focus and
+    // dismiss it when the control loses focus. If you leave the policy as Automatic, then
+    // the system will hide and show the Input Pane for you. Note that on Desktop, you will
+    // need to implement the UIA text pattern to get expected automatic behavior.
+    //_editContext.InputPaneDisplayPolicy = CoreTextInputPaneDisplayPolicy.Manual;
+    editContext.inputPaneDisplayPolicy = WUTCCoreTextInputPaneDisplayPolicyManual;
+
+    // Set the input scope to Text because this text box is for any text.
+    // This also informs software keyboards to show their regular
+    // text entry layout.  There are many other input scopes and each will
+    // inform a keyboard layout and text behavior.
+    //_editContext.InputScope = CoreTextInputScope.Text;
+    editContext.inputScope = WUTCCoreTextInputScopeText;
+
+    // The system raises this event to request a specific range of text.
+    //_editContext.TextRequested += EditContext_TextRequested;
+    EventRegistrationToken textRequestedToken = [editContext addTextRequestedEvent:^(WUTCCoreTextEditContext* context, WUTCCoreTextTextRequestedEventArgs* args) {
+        // Return the text
+        WUTCCoreTextTextRequest* request = args.request;
+        NSUInteger startRange = MIN(request.range.startCaretPosition, textLabel.text.length);
+        NSUInteger endRange = MIN(request.range.endCaretPosition, textLabel.text.length);
+        request.text = [textLabel.text substringWithRange:NSMakeRange(startRange, endRange - startRange)];
+    }];
+
+    // The system raises this event to request the current selection.
+    //_editContext.SelectionRequested += EditContext_SelectionRequested;
+    EventRegistrationToken selectionRequestedToken = [editContext addSelectionRequestedEvent:^(WUTCCoreTextEditContext* context, WUTCCoreTextSelectionRequestedEventArgs* args) {
+        // Return the selection
+    }];
+
+    // The system raises this event when it wants the edit control to remove focus.
+    //_editContext.FocusRemoved += EditContext_FocusRemoved;
+    EventRegistrationToken focusRemovedToken = [editContext addSelectionRequestedEvent:^(WUTCCoreTextEditContext* context, WUTCCoreTextSelectionRequestedEventArgs* args) {
+        // Return the selection
+    }];
+
+    // The system raises this event to update text in the edit control.
+    //_editContext.TextUpdating += EditContext_TextUpdating;
+    EventRegistrationToken textUpdatingToken = [editContext addTextUpdatingEvent:^(WUTCCoreTextEditContext* context, WUTCCoreTextTextUpdatingEventArgs* args) {
+        // Update label text
+        textLabel.text = [textLabel.text stringByAppendingString:args.text];
+    }];
+
+    // The system raises this event to change the selection in the edit control.
+    //_editContext.SelectionUpdating += EditContext_SelectionUpdating;
+    EventRegistrationToken selectionUpdatingToken = [editContext addSelectionUpdatingEvent:^(WUTCCoreTextEditContext* context, WUTCCoreTextSelectionUpdatingEventArgs* args) {
+        // Highlight text
+    }];
+
+    // The system raises this event when it wants the edit control
+    // to apply formatting on a range of text.
+    //_editContext.FormatUpdating += EditContext_FormatUpdating;
+    EventRegistrationToken formatUpdatingToken = [editContext addFormatUpdatingEvent:^(WUTCCoreTextEditContext* context, WUTCCoreTextFormatUpdatingEventArgs* args) {
+        // Update formatting
+    }];
+
+    // The system raises this event to request layout information.
+    // This is used to help choose a position for the IME candidate window.
+    //_editContext.LayoutRequested += EditContext_LayoutRequested;
+    EventRegistrationToken layoutRequestedToken = [editContext addLayoutRequestedEvent:^(WUTCCoreTextEditContext* context, WUTCCoreTextLayoutRequestedEventArgs* args) {
+        // Return the frame?
+    }];
+
+    // The system raises this event to notify the edit control
+    // that the string composition has started.
+    //_editContext.CompositionStarted += EditContext_CompositionStarted;
+    EventRegistrationToken compositionStartedToken = [editContext addCompositionStartedEvent:^(WUTCCoreTextEditContext* context, WUTCCoreTextCompositionStartedEventArgs* args) {
+        // Not sure.
+    }];
+
+    // The system raises this event to notify the edit control
+    // that the string composition is finished.
+    //_editContext.CompositionCompleted += EditContext_CompositionCompleted;
+    EventRegistrationToken compositionCompletedToken = [editContext addCompositionCompletedEvent:^(WUTCCoreTextEditContext* context, WUTCCoreTextCompositionCompletedEventArgs* args) {
+        // Not sure.
+    }];
+
+    // The system raises this event when the NotifyFocusLeave operation has
+    // completed. Our sample does not use this event.
+    // _editContext.NotifyFocusLeaveCompleted += EditContext_NotifyFocusLeaveCompleted;
+    
     [self.view addSubview:label];
 }
 
