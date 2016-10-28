@@ -16,6 +16,6 @@
 
 #import <UIKit/UIKit.h>
 
-@interface PageViewController : UIPageViewController
+@interface PageViewController : UIViewController
 
 @end
